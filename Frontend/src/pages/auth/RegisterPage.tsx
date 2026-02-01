@@ -19,7 +19,12 @@ const registerSchema = z
     lastName: z.string().min(2, "Last name is required"),
     email: z.string().email("Invalid email address"),
     role: z.enum(["ADMIN", "PORTAL"], { required_error: "Role is required" }),
-    password: z.string().min(8, "Password must be at least 8 characters"),
+    password: z
+      .string()
+      .min(8, "Password must be at least 8 characters")
+      .regex(/[A-Z]/, "Must include an uppercase letter")
+      .regex(/[a-z]/, "Must include a lowercase letter")
+      .regex(/[!@#$%^&*(),.?":{}|<>]/, "Must include a special character"),
     confirmPassword: z.string(),
   })
   .refine((data) => data.password === data.confirmPassword, {
@@ -51,9 +56,18 @@ export default function RegisterPage() {
   const onSubmit = async (data: RegisterSchema) => {
     setIsLoading(true);
     try {
+      const emailLocal = data.email.split("@")[0];
+      const normalizedLoginId = (() => {
+        const trimmed = emailLocal.replace(/[^a-zA-Z0-9]/g, "");
+        if (trimmed.length >= 6 && trimmed.length <= 12) return trimmed;
+        if (trimmed.length > 12) return trimmed.slice(0, 12);
+        const pad = "1234567890";
+        return (trimmed + pad).slice(0, 6);
+      })();
+
       await registerUser({
         name: `${data.firstName} ${data.lastName}`,
-        loginId: data.email,
+        loginId: normalizedLoginId,
         email: data.email,
         password: data.password,
         role: data.role,

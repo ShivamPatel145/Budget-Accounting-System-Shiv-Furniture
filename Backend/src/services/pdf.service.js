@@ -83,6 +83,61 @@ export const generateInvoicePDF = async (invoiceId) => {
     }
   }
 
-  doc.end();
   return doc;
+};
+
+export const generatePaymentReceiptPDF = async (paymentId) => {
+  const payment = await prisma.payment.findUnique({
+    where: { id: paymentId },
+    include: {
+      vendorBill: { include: { vendor: true } },
+      customerInvoice: { include: { customer: true } },
+    },
+  });
+
+  if (!payment) throw new ApiError(404, "Payment not found");
+
+  const doc = new PDFDocument({ margin: 50 });
+
+  const paidDate = payment.paidAt || payment.createdAt;
+  const payeeName =
+    payment.paymentType === "BILL"
+      ? payment.vendorBill?.vendor?.name || "Vendor"
+      : payment.customerInvoice?.customer?.name || "Customer";
+
+  doc.fontSize(18).text("PAYMENT RECEIPT", { align: "center" });
+  doc.moveDown();
+
+  doc.fontSize(12).text(`Receipt No: ${payment.number || payment.id}`);
+  doc.text(`Date: ${paidDate.toISOString().split("T")[0]}`);
+  doc.text(`Status: ${payment.status}`);
+  doc.text(`Method: ${payment.method}`);
+  doc.moveDown();
+
+  doc.fontSize(14).text("Payer Details", { underline: true });
+  doc.moveDown(0.5);
+  doc.fontSize(12).text(`Name: ${payeeName}`);
+  if (payment.paymentType === "BILL") {
+    doc.text(`Bill: ${payment.vendorBill?.number || "-"}`);
+  } else {
+    doc.text(`Invoice: ${payment.customerInvoice?.number || "-"}`);
+  }
+  doc.moveDown();
+
+  doc.fontSize(14).text("Payment Summary", { underline: true });
+  doc.moveDown(0.5);
+  doc
+    .fontSize(12)
+    .text(`Amount Paid: ${Number(payment.amount).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`);
+  if (payment.referenceNotes) {
+    doc.moveDown(0.5);
+    doc.text(`Notes: ${payment.referenceNotes}`);
+  }
+
+  doc.moveDown(2);
+  doc.fontSize(11).text("This is a system-generated receipt.", {
+    align: "center",
+  });
+
+  return { doc, payment };
 };

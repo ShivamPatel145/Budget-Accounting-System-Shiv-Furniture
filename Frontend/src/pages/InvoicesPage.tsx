@@ -1,4 +1,7 @@
 import { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { motion } from "framer-motion";
 import { 
   FileText, 
@@ -14,6 +17,7 @@ import {
   Clock,
   AlertCircle,
   XCircle,
+  Trash2,
   IndianRupee,
   Calendar,
   Building2,
@@ -31,6 +35,29 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Table,
   TableBody,
   TableCell,
@@ -42,6 +69,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { customerInvoicesService, CustomerInvoice } from "@/lib/customer-invoices-service";
 import { useNavigate } from "react-router-dom";
+import { contactsService, Contact } from "@/lib/contacts-service";
+import { productsService, Product } from "@/lib/products-service";
+import { analyticalService, AnalyticalAccount } from "@/lib/analytical-service";
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('en-IN', {
@@ -68,12 +98,37 @@ const statusConfig: Record<string, { label: string; icon: any; class: string }> 
   CANCELLED: { label: "Cancelled", icon: XCircle, class: "bg-destructive/10 text-destructive border-destructive/20" }
 };
 
+const invoiceSchema = z.object({
+  customerId: z.string().min(1, "Customer is required"),
+  invoiceDate: z.string().min(1, "Invoice date is required"),
+  dueDate: z.string().optional(),
+  analyticalAccountId: z.string().optional(),
+});
+
+type InvoiceFormData = z.infer<typeof invoiceSchema>;
+
 const InvoicesPage = () => {
   const [invoices, setInvoices] = useState<CustomerInvoice[]>([]);
+  const [customers, setCustomers] = useState<Contact[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [analyticalAccounts, setAnalyticalAccounts] = useState<AnalyticalAccount[]>([]);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("all");
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [invoiceItems, setInvoiceItems] = useState([{ productId: "", quantity: "", unitPrice: "" }]);
   const navigate = useNavigate();
+
+  const form = useForm<InvoiceFormData>({
+    resolver: zodResolver(invoiceSchema),
+    defaultValues: {
+      customerId: "",
+      invoiceDate: new Date().toISOString().split("T")[0],
+      dueDate: "",
+      analyticalAccountId: "",
+    },
+  });
 
   useEffect(() => {
     fetchInvoices();
@@ -82,8 +137,16 @@ const InvoicesPage = () => {
   const fetchInvoices = async () => {
     try {
       setLoading(true);
-      const data = await customerInvoicesService.list();
+      const [data, contactsData, productsData, analyticalData] = await Promise.all([
+        customerInvoicesService.list(),
+        contactsService.list(),
+        productsService.list(),
+        analyticalService.list(),
+      ]);
       setInvoices(data);
+      setCustomers(contactsData.filter((c) => c.type === "CUSTOMER" || c.type === "BOTH"));
+      setProducts(productsData);
+      setAnalyticalAccounts(analyticalData);
     } catch (error) {
       console.error("Failed to fetch invoices:", error);
       toast.error("Failed to load invoices");
@@ -99,6 +162,75 @@ const InvoicesPage = () => {
       await fetchInvoices();
     } catch (error: any) {
       toast.error(error.response?.data?.message || "Failed to confirm invoice");
+    }
+  };
+
+  const handleDialogClose = () => {
+    setIsDialogOpen(false);
+    setInvoiceItems([{ productId: "", quantity: "", unitPrice: "" }]);
+    form.reset({
+      customerId: "",
+      invoiceDate: new Date().toISOString().split("T")[0],
+      dueDate: "",
+      analyticalAccountId: "",
+    });
+  };
+
+  const addItem = () => {
+    setInvoiceItems([...invoiceItems, { productId: "", quantity: "", unitPrice: "" }]);
+  };
+
+  const removeItem = (index: number) => {
+    setInvoiceItems(invoiceItems.filter((_, i) => i !== index));
+  };
+
+  const updateItem = (index: number, field: string, value: string) => {
+    const updated = invoiceItems.map((item, i) => (i === index ? { ...item, [field]: value } : item));
+    setInvoiceItems(updated);
+  };
+
+  const handleCreate = async (data: InvoiceFormData) => {
+    try {
+      setSubmitting(true);
+
+      const lines = invoiceItems
+        .filter((item) => item.productId && item.quantity && item.unitPrice)
+        .map((item) => ({
+          productId: item.productId,
+          quantity: parseFloat(item.quantity) || 0,
+          unitPrice: parseFloat(item.unitPrice) || 0,
+          analyticalAccountId: data.analyticalAccountId || undefined,
+        }));
+
+      if (lines.length === 0) {
+        toast.error("Please add at least one line");
+        return;
+      }
+
+      const invoiceNumber = `INV-${new Date().getFullYear()}-${String(invoices.length + 1).padStart(3, "0")}`;
+
+      const invoiceDateIso = data.invoiceDate
+        ? new Date(`${data.invoiceDate}T00:00:00.000Z`).toISOString()
+        : new Date().toISOString();
+      const dueDateIso = data.dueDate
+        ? new Date(`${data.dueDate}T00:00:00.000Z`).toISOString()
+        : undefined;
+
+      await customerInvoicesService.create({
+        number: invoiceNumber,
+        customerId: data.customerId,
+        invoiceDate: invoiceDateIso,
+        dueDate: dueDateIso,
+        lines,
+      });
+
+      toast.success("Invoice created successfully");
+      await fetchInvoices();
+      handleDialogClose();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Failed to create invoice");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -146,10 +278,164 @@ const InvoicesPage = () => {
           <h1 className="text-2xl font-bold text-foreground">Invoices</h1>
           <p className="text-muted-foreground">Manage customer invoices and payments</p>
         </div>
-        <Button variant="gradient" className="gap-2">
-          <Plus className="w-4 h-4" />
-          Create Invoice
-        </Button>
+        <Dialog open={isDialogOpen} onOpenChange={(open) => (open ? setIsDialogOpen(true) : handleDialogClose())}>
+          <DialogTrigger asChild>
+            <Button variant="gradient" className="gap-2">
+              <Plus className="w-4 h-4" />
+              Create Invoice
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[620px]">
+            <DialogHeader>
+              <DialogTitle>Create Invoice</DialogTitle>
+              <DialogDescription>Capture customer, lines, and dates</DialogDescription>
+            </DialogHeader>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(handleCreate)} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="customerId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Customer</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select customer" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {customers.map((c) => (
+                              <SelectItem key={c.id} value={c.id}>
+                                {c.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="analyticalAccountId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Cost Center (optional)</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select cost center" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {analyticalAccounts.map((a) => (
+                              <SelectItem key={a.id} value={a.id}>
+                                {a.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="invoiceDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Invoice Date</FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="dueDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Due Date</FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <FormLabel>Invoice Lines</FormLabel>
+                    <Button type="button" variant="outline" size="sm" onClick={addItem}>
+                      <Plus className="w-4 h-4 mr-1" /> Add Line
+                    </Button>
+                  </div>
+                  <div className="space-y-3">
+                    {invoiceItems.map((item, idx) => (
+                      <div key={idx} className="grid grid-cols-12 gap-3 items-center">
+                        <div className="col-span-5">
+                          <Select
+                            value={item.productId}
+                            onValueChange={(v) => updateItem(idx, "productId", v)}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select product" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {products.map((p) => (
+                                <SelectItem key={p.id} value={p.id}>
+                                  {p.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="col-span-2">
+                          <Input
+                            type="number"
+                            min="0"
+                            placeholder="Qty"
+                            value={item.quantity}
+                            onChange={(e) => updateItem(idx, "quantity", e.target.value)}
+                          />
+                        </div>
+                        <div className="col-span-3">
+                          <Input
+                            type="number"
+                            min="0"
+                            placeholder="Unit Price"
+                            value={item.unitPrice}
+                            onChange={(e) => updateItem(idx, "unitPrice", e.target.value)}
+                          />
+                        </div>
+                        <div className="col-span-2 flex justify-end">
+                          <Button type="button" variant="ghost" size="icon" onClick={() => removeItem(idx)}>
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2">
+                  <Button type="button" variant="outline" onClick={handleDialogClose} disabled={submitting}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={submitting}>
+                    {submitting ? "Creating..." : "Create Invoice"}
+                  </Button>
+                </div>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* Stats */}
@@ -288,7 +574,7 @@ const InvoicesPage = () => {
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button variant="ghost" size="icon" className="transition-opacity">
                             <MoreVertical className="w-4 h-4" />
                           </Button>
                         </DropdownMenuTrigger>

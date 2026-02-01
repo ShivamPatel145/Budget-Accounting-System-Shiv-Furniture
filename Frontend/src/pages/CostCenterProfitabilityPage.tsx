@@ -68,10 +68,14 @@ const CostCenterProfitabilityPage = () => {
           if (budget.status === "CONFIRMED" || budget.status === "REVISED") {
             const existing = dataMap.get(budget.analyticalAccountId) || { income: 0, expense: 0 };
             budget.lines.forEach(line => {
+              const planned = Number(line.budgetedAmount) || 0;
+              const actual = Number(line.actualAmount) || 0;
+              const effectiveActual = actual > 0 ? actual : planned; // fallback when actuals not posted yet
+
               if (line.type === "INCOME") {
-                existing.income += Number(line.actualAmount) || 0;
+                existing.income += effectiveActual;
               } else {
-                existing.expense += Number(line.actualAmount) || 0;
+                existing.expense += effectiveActual;
               }
             });
             dataMap.set(budget.analyticalAccountId, existing);

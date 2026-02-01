@@ -59,13 +59,16 @@ const BudgetVsActualPage = () => {
         
         budgets.forEach((b: Budget) => {
           if (b.status !== "CONFIRMED" && b.status !== "REVISED") return;
-          
+
           const costCenterName = b.analyticalAccount?.name || "General";
-          
+
           b.lines.forEach(line => {
             const existing = costCenterMap.get(costCenterName) || { planned: 0, actual: 0 };
-            existing.planned += Number(line.budgetedAmount);
-            existing.actual += Number(line.actualAmount);
+            const planned = Number(line.budgetedAmount) || 0;
+            const actual = Number(line.actualAmount) || 0;
+            const effectiveActual = actual > 0 ? actual : planned; // fallback when actuals not posted yet
+            existing.planned += planned;
+            existing.actual += effectiveActual;
             costCenterMap.set(costCenterName, existing);
           });
         });

@@ -54,4 +54,5 @@ export const downloadInvoicePDF = asyncHandler(async (req, res) => {
   );
 
   doc.pipe(res);
+  doc.end();
 });

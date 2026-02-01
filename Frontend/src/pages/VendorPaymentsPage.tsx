@@ -104,6 +104,10 @@ const VendorPaymentsPage = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("all");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [detailsPayment, setDetailsPayment] = useState<any | null>(null);
+  const [receiptLoadingId, setReceiptLoadingId] = useState<string | null>(
+    null,
+  );
 
   // Pre-select bill from URL params (e.g., from VendorBillsPage)
   const preselectedBillId = searchParams.get("billId");
@@ -191,6 +195,47 @@ const VendorPaymentsPage = () => {
     const bill = vendorBills.find((b) => b.id === billId);
     if (bill) {
       form.setValue("amount", bill.amountDue);
+    }
+  };
+
+  const handleViewDetails = (payment: any) => {
+    setDetailsPayment(payment);
+  };
+
+  const closeDetails = () => setDetailsPayment(null);
+
+  const handleDownloadReceipt = async (payment: any, forPrint = false) => {
+    try {
+      setReceiptLoadingId(payment.id);
+      const blob = await paymentsService.downloadReceipt(payment.id);
+      const url = URL.createObjectURL(blob);
+
+      if (forPrint) {
+        const win = window.open(url);
+        if (win) {
+          win.addEventListener("load", () => {
+            win.focus();
+            win.print();
+          });
+        } else {
+          window.open(url, "_blank");
+        }
+      } else {
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `${payment.number || "payment-receipt"}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        toast.success("Receipt downloaded");
+      }
+
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    } catch (error) {
+      console.error("Receipt download failed", error);
+      toast.error("Failed to generate receipt");
+    } finally {
+      setReceiptLoadingId(null);
     }
   };
 
@@ -351,6 +396,81 @@ const VendorPaymentsPage = () => {
             </Form>
           </DialogContent>
         </Dialog>
+        <Dialog open={!!detailsPayment} onOpenChange={(open) => !open && closeDetails()}>
+          <DialogContent className="sm:max-w-[480px]">
+            <DialogHeader>
+              <DialogTitle>Payment Details</DialogTitle>
+              <DialogDescription>
+                {detailsPayment?.number || "Payment"}
+              </DialogDescription>
+            </DialogHeader>
+            {detailsPayment && (
+              <div className="space-y-3 text-sm">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-muted-foreground">Vendor</p>
+                    <p className="font-medium">
+                      {detailsPayment.vendorBill?.vendor?.name || "Unknown"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Bill</p>
+                    <p className="font-mono">
+                      {detailsPayment.vendorBill?.number || "-"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Date</p>
+                    <p>
+                      {detailsPayment.paidAt
+                        ? formatDate(detailsPayment.paidAt)
+                        : formatDate(detailsPayment.createdAt)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Method</p>
+                    <p className="font-medium">{detailsPayment.method}</p>
+                  </div>
+                </div>
+                <div className="rounded-lg bg-muted/60 p-3 flex items-center justify-between">
+                  <div>
+                    <p className="text-muted-foreground text-xs">Amount</p>
+                    <p className="text-lg font-semibold">
+                      {formatCurrency(Number(detailsPayment.amount))}
+                    </p>
+                  </div>
+                  {getStatusBadge(detailsPayment.status)}
+                </div>
+                {detailsPayment.referenceNotes && (
+                  <div>
+                    <p className="text-muted-foreground text-xs">Notes</p>
+                    <p>{detailsPayment.referenceNotes}</p>
+                  </div>
+                )}
+                <div className="flex justify-end gap-2 pt-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDownloadReceipt(detailsPayment)}
+                    disabled={receiptLoadingId === detailsPayment.id}
+                  >
+                    <Download className="w-4 h-4 mr-1" />
+                    Download
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => handleDownloadReceipt(detailsPayment, true)}
+                    disabled={receiptLoadingId === detailsPayment.id}
+                  >
+                    <Printer className="w-4 h-4 mr-1" />
+                    Print
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* Stats Cards */}
@@ -480,22 +600,30 @@ const VendorPaymentsPage = () => {
                       <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button variant="ghost" size="icon" className="transition-opacity">
                               <MoreVertical className="w-4 h-4" />
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleViewDetails(payment)}>
                               <Eye className="w-4 h-4 mr-2" />
                               View Details
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handleDownloadReceipt(payment)}
+                              disabled={receiptLoadingId === payment.id}
+                            >
                               <Download className="w-4 h-4 mr-2" />
-                              Download Receipt
+                              {receiptLoadingId === payment.id
+                                ? "Preparing..."
+                                : "Download Receipt"}
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handleDownloadReceipt(payment, true)}
+                              disabled={receiptLoadingId === payment.id}
+                            >
                               <Printer className="w-4 h-4 mr-2" />
-                              Print
+                              {receiptLoadingId === payment.id ? "Preparing" : "Print"}
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>

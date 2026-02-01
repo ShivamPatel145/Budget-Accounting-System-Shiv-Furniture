@@ -45,12 +45,38 @@ const BudgetFormPanel = ({ open, onClose, budget, onSuccess }: BudgetFormPanelPr
     name: budget?.name || "",
     type: budget?.type || "expense",
     period: budget?.period || "",
-    costCenter: budget?.costCenter || "",
-    allocated: budget?.allocated || "",
+    costCenter: (budget as any)?.analyticalAccountId || budget?.costCenter || "",
+    allocated: (budget as any)?.lineAmount || budget?.allocated || "",
     description: "",
     warningThreshold: 85,
     lockAfterPeriod: true
   });
+
+  useEffect(() => {
+    if (budget) {
+      setFormData({
+        name: budget.name || "",
+        type: budget.type || "expense",
+        period: budget.period || "",
+        costCenter: (budget as any)?.analyticalAccountId || budget.costCenter || "",
+        allocated: (budget as any)?.lineAmount || budget.allocated || "",
+        description: "",
+        warningThreshold: 85,
+        lockAfterPeriod: true,
+      });
+    } else {
+      setFormData({
+        name: "",
+        type: "expense",
+        period: "",
+        costCenter: "",
+        allocated: "",
+        description: "",
+        warningThreshold: 85,
+        lockAfterPeriod: true,
+      });
+    }
+  }, [budget]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -105,20 +131,25 @@ const BudgetFormPanel = ({ open, onClose, budget, onSuccess }: BudgetFormPanelPr
         periodEnd.setMonth(now.getMonth() + 3);
       }
 
-      await budgetsService.create({
+      const payload = {
         name: formData.name,
         analyticalAccountId: formData.costCenter,
         periodStart: now.toISOString(),
         periodEnd: periodEnd.toISOString(),
         lines: [{
-          name: formData.name,
           type: formData.type === "income" ? "INCOME" : "EXPENSE",
           budgetedAmount: parseFloat(formData.allocated),
-          actualAmount: 0
-        }]
-      });
+        }],
+      } as any;
 
-      toast.success("Budget created successfully");
+      if (budget?.id) {
+        await budgetsService.update(budget.id, payload);
+        toast.success("Budget updated successfully");
+      } else {
+        await budgetsService.create(payload);
+        toast.success("Budget created successfully");
+      }
+
       onClose();
       onSuccess?.();
     } catch (error) {

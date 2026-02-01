@@ -39,6 +39,7 @@ import { dashboardService, DashboardPeriod } from "@/lib/dashboard-service";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/auth-context";
 import PortalDashboardContent from "./PortalDashboard";
+import { budgetsService } from "@/lib/budgets-service";
 
 const fadeInUp = {
   initial: { opacity: 0, y: 16 },
@@ -78,6 +79,45 @@ const Dashboard = () => {
     refetchInterval: 60000, // Refetch every minute
   });
 
+  const { data: budgetsData } = useQuery({
+    queryKey: ["dashboard-budgets"],
+    queryFn: () => budgetsService.list(),
+    staleTime: 60000,
+  });
+
+  const derivedBudgetTotals = (() => {
+    if (!budgetsData || budgetsData.length === 0) return null;
+
+    const active = budgetsData.filter(
+      (b: any) => b.status === "CONFIRMED" || b.status === "REVISED"
+    );
+    if (active.length === 0) return null;
+
+    let income = 0;
+    let expense = 0;
+    let plannedExpense = 0;
+
+    active.forEach((b: any) => {
+      b.lines.forEach((l: any) => {
+        if (l.type === "INCOME") {
+          income += Number(l.actualAmount || 0);
+        } else {
+          expense += Number(l.actualAmount || 0);
+          plannedExpense += Number(l.budgetedAmount || 0);
+        }
+      });
+    });
+
+    const utilization = plannedExpense > 0 ? Math.round((expense / plannedExpense) * 100) : 0;
+    return {
+      income,
+      expense,
+      net: income - expense,
+      budgetUtilization: utilization,
+      activeCount: active.length,
+    };
+  })();
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
@@ -103,37 +143,63 @@ const Dashboard = () => {
   const stats = [
     {
       title: "Total Income",
-      value: formatCurrency(dashboardData?.totalIncome || 0),
+      value: formatCurrency(
+        (derivedBudgetTotals?.income ?? 0) || dashboardData?.totalIncome || 0
+      ),
       change: dashboardData?.incomeChange ?? 0,
-      trend: (dashboardData?.incomeChange ?? 0) >= 0 ? "up" : "down",
+      trend:
+        ((dashboardData?.incomeChange ?? 0) >= 0 ? "up" : "down") as
+          | "up"
+          | "down"
+          | "neutral",
       icon: ArrowUpRight,
       color: "text-success",
       bgColor: "bg-success/10"
     },
     {
       title: "Total Expenses",
-      value: formatCurrency(dashboardData?.totalExpense || 0),
+      value: formatCurrency(
+        (derivedBudgetTotals?.expense ?? 0) || dashboardData?.totalExpense || 0
+      ),
       change: dashboardData?.expenseChange ?? 0,
-      trend: (dashboardData?.expenseChange ?? 0) >= 0 ? "up" : "down",
+      trend:
+        ((dashboardData?.expenseChange ?? 0) >= 0 ? "up" : "down") as
+          | "up"
+          | "down"
+          | "neutral",
       icon: ArrowDownLeft,
       color: "text-warning",
       bgColor: "bg-warning/10"
     },
     {
       title: "Net Balance",
-      value: formatCurrency(dashboardData?.netBalance || 0),
+      value: formatCurrency(
+        (derivedBudgetTotals?.net ?? 0) || dashboardData?.netBalance || 0
+      ),
       change: dashboardData?.balanceChange ?? 0,
-      trend: (dashboardData?.netBalance || 0) >= 0 ? "up" : "down",
+      trend:
+        ((derivedBudgetTotals?.net ?? dashboardData?.netBalance ?? 0) >= 0
+          ? "up"
+          : "down") as "up" | "down" | "neutral",
       icon: Wallet,
       color: "text-accent",
       bgColor: "bg-accent/10"
     },
     {
       title: "Budget Utilized",
-      value: `${dashboardData?.budgetUtilization || 0}%`,
+      value: `${
+        derivedBudgetTotals?.budgetUtilization ?? dashboardData?.budgetUtilization ?? 0
+      }%`,
       change: null,
       trend: "neutral",
-      statusText: (dashboardData?.budgetUtilization || 0) <= 80 ? "On Track" : (dashboardData?.budgetUtilization || 0) <= 100 ? "Warning" : "Over Budget",
+      statusText:
+        (derivedBudgetTotals?.budgetUtilization ?? dashboardData?.budgetUtilization ?? 0) <=
+        80
+          ? "On Track"
+          : (derivedBudgetTotals?.budgetUtilization ?? dashboardData?.budgetUtilization ?? 0) <=
+              100
+            ? "Warning"
+            : "Over Budget",
       icon: Target,
       color: "text-primary",
       bgColor: "bg-primary/10"

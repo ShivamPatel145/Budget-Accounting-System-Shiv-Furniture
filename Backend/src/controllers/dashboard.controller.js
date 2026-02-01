@@ -5,6 +5,47 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 export const getDashboardStats = asyncHandler(async (req, res) => {
   const { period = "month" } = req.query;
 
+  const aggregateBudgetTotals = async (start, end) => {
+    const where = {
+      status: { in: ["CONFIRMED", "REVISED"] },
+    };
+
+    if (start && end) {
+      where.periodStart = { lte: end };
+      where.periodEnd = { gte: start };
+    }
+
+    const budgets = await prisma.budget.findMany({
+      where,
+      include: { lines: true },
+    });
+
+    let incomeActual = 0;
+    let incomeBudgeted = 0;
+    let expenseActual = 0;
+    let expenseBudgeted = 0;
+
+    budgets.forEach((budget) => {
+      budget.lines.forEach((line) => {
+        if (line.type === "INCOME") {
+          incomeActual += Number(line.actualAmount ?? 0);
+          incomeBudgeted += Number(line.budgetedAmount ?? 0);
+        } else {
+          expenseActual += Number(line.actualAmount ?? 0);
+          expenseBudgeted += Number(line.budgetedAmount ?? 0);
+        }
+      });
+    });
+
+    return {
+      incomeActual,
+      incomeBudgeted,
+      expenseActual,
+      expenseBudgeted,
+      count: budgets.length,
+    };
+  };
+
   // Calculate date ranges based on period
   const now = new Date();
   let currentStart, currentEnd, previousStart, previousEnd;
@@ -100,46 +141,75 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
     previousExpense = Number(prevExpenseAgg._sum.total) || 0;
   }
 
+  const currentBudgetAgg = await aggregateBudgetTotals(currentStart, currentEnd);
+  const previousBudgetAgg = previousStart
+    ? await aggregateBudgetTotals(previousStart, previousEnd)
+    : {
+        incomeActual: 0,
+        incomeBudgeted: 0,
+        expenseActual: 0,
+        expenseBudgeted: 0,
+        count: 0,
+      };
+
+  const effectiveIncome =
+    totalIncome || currentBudgetAgg.incomeActual || currentBudgetAgg.incomeBudgeted;
+  const effectiveExpense =
+    totalExpense ||
+    currentBudgetAgg.expenseActual ||
+    currentBudgetAgg.expenseBudgeted;
+
+  const effectivePreviousIncome =
+    previousIncome ||
+    previousBudgetAgg.incomeActual ||
+    previousBudgetAgg.incomeBudgeted;
+  const effectivePreviousExpense =
+    previousExpense ||
+    previousBudgetAgg.expenseActual ||
+    previousBudgetAgg.expenseBudgeted;
+
+  const percentChange = (current, previous) => {
+    if (previous > 0) {
+      return parseFloat((((current - previous) / previous) * 100).toFixed(1));
+    }
+    if (current > 0) {
+      return 100.0;
+    }
+    return 0.0;
+  };
+
   // Calculate percentage changes
-  const incomeChange =
-    previousIncome > 0
-      ? (((totalIncome - previousIncome) / previousIncome) * 100).toFixed(1)
-      : totalIncome > 0
-        ? "100.0"
-        : "0.0";
+  const incomeChange = percentChange(effectiveIncome, effectivePreviousIncome);
 
-  const expenseChange =
-    previousExpense > 0
-      ? (((totalExpense - previousExpense) / previousExpense) * 100).toFixed(1)
-      : totalExpense > 0
-        ? "100.0"
-        : "0.0";
+  const expenseChange = percentChange(effectiveExpense, effectivePreviousExpense);
 
-  const netBalance = totalIncome - totalExpense;
-  const previousNetBalance = previousIncome - previousExpense;
+  const netBalance = effectiveIncome - effectiveExpense;
+  const previousNetBalance =
+    effectivePreviousIncome - effectivePreviousExpense;
   const balanceChange =
     previousNetBalance !== 0
-      ? (
-          ((netBalance - previousNetBalance) / Math.abs(previousNetBalance)) *
-          100
-        ).toFixed(1)
+      ? parseFloat(
+          (
+            ((netBalance - previousNetBalance) /
+              Math.abs(previousNetBalance)) *
+            100
+          ).toFixed(1),
+        )
       : netBalance > 0
-        ? "100.0"
-        : "0.0";
+        ? 100.0
+        : 0.0;
 
   // 3. Active Budgets
-  const activeBudgetsCount = await prisma.budget.count({
-    where: { status: { in: ["CONFIRMED", "REVISED"] } },
-  });
+  const activeBudgetsCount = currentBudgetAgg.count;
 
-  // Budget utilization
-  const budgetAgg = await prisma.budgetLine.aggregate({
-    _sum: { budgetedAmount: true, actualAmount: true },
-  });
-  const totalBudgeted = Number(budgetAgg._sum.budgetedAmount) || 0;
-  const totalActual = Number(budgetAgg._sum.actualAmount) || 0;
+  // Budget utilization scoped to active budgets in the selected period
   const budgetUtilization =
-    totalBudgeted > 0 ? Math.round((totalActual / totalBudgeted) * 100) : 0;
+    currentBudgetAgg.expenseBudgeted > 0
+      ? Math.round(
+          (currentBudgetAgg.expenseActual / currentBudgetAgg.expenseBudgeted) *
+            100,
+        )
+      : 0;
 
   // 4. Recent Transactions (Combined PO and SO for simplicity or just Invoices/Bills)
   const recentInvoices = await prisma.customerInvoice.findMany({
@@ -156,12 +226,12 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
 
   res.json(
     new ApiResponse(200, {
-      totalIncome,
-      totalExpense,
+      totalIncome: effectiveIncome,
+      totalExpense: effectiveExpense,
       netBalance,
-      incomeChange: parseFloat(incomeChange),
-      expenseChange: parseFloat(expenseChange),
-      balanceChange: parseFloat(balanceChange),
+      incomeChange,
+      expenseChange,
+      balanceChange,
       activeBudgetsCount,
       budgetUtilization,
       period,

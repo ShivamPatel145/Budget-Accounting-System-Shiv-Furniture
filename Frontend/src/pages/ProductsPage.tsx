@@ -464,7 +464,7 @@ const ProductsPage = () => {
                         </TableCell>
                         <TableCell className="text-muted-foreground">Piece</TableCell>
                         <TableCell className="text-right">
-                          <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <div className="flex justify-end gap-1">
                             <Button
                               variant="ghost"
                               size="sm"

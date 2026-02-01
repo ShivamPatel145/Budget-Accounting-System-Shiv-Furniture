@@ -1,0 +1,10 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Blocks -->
+  <rect x="10" y="34" width="12" height="16" rx="2" fill="white"></rect>
+  <rect x="26" y="28" width="12" height="22" rx="2" fill="white"></rect>
+  <rect x="42" y="22" width="12" height="28" rx="2" fill="white"></rect>
+
+  <!-- Growth Arrow -->
+  <path d="M12 26 L28 18 L38 22 L52 10" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M48 10 H52 V14" stroke="white" stroke-width="3" stroke-linecap="round"></path>
+</svg>

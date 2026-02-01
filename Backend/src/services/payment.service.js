@@ -11,6 +11,19 @@ class PaymentService {
     };
   }
 
+  #generateNumber(prefix = "PAY") {
+    // Basic unique-ish number: PAY-YYYYMMDD-HHMMSS-XXXX
+    const now = new Date();
+    const ts = now
+      .toISOString()
+      .replace(/[-:T.Z]/g, "")
+      .slice(0, 14);
+    const rand = Math.floor(Math.random() * 10000)
+      .toString()
+      .padStart(4, "0");
+    return `${prefix}-${ts}-${rand}`;
+  }
+
   async listPayments() {
     return await prisma.payment.findMany({
       orderBy: { createdAt: "desc" },
@@ -31,6 +44,8 @@ class PaymentService {
 
     let bill, invoice;
 
+    const paymentNumber = number && number.trim() !== "" ? number : this.#generateNumber();
+
     if (paymentType === "BILL") {
       bill = await prisma.vendorBill.findUnique({
         where: { id: vendorBillId },
@@ -48,7 +63,7 @@ class PaymentService {
     return await prisma.$transaction(async (tx) => {
       const pay = await tx.payment.create({
         data: {
-          number,
+          number: paymentNumber,
           paymentType,
           method,
           status: "PAID",

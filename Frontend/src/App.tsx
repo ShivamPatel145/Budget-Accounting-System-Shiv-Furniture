@@ -5,8 +5,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./context/auth-context";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
-import LoginPage from "./pages/LoginPage";
-import RegisterPage from "./pages/RegisterPage";
+import LoginPage from "./pages/auth/LoginPage";
+import RegisterPage from "./pages/auth/RegisterPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import AuthCallbackPage from "./pages/AuthCallbackPage";
 import MockGoogleLoginPage from "./pages/MockGoogleLoginPage";
@@ -93,6 +93,7 @@ const App = () => (
                 <Route path="/purchases/orders" element={<Navigate to="/purchase/orders" replace />} />
                 <Route path="/purchases/bills" element={<Navigate to="/purchase/bills" replace />} />
                 <Route path="/purchases/payments" element={<Navigate to="/purchase/payments" replace />} />
+                <Route path="/accounting/vendor-payments" element={<Navigate to="/purchase/payments" replace />} />
                 <Route path="/sales/orders" element={<Navigate to="/sale/orders" replace />} />
                 <Route path="/sales/invoices" element={<Navigate to="/sale/invoices" replace />} />
                 <Route path="/sales/receipts" element={<Navigate to="/sale/receipts" replace />} />

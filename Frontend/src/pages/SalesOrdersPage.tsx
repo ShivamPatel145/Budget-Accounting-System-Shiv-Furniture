@@ -147,6 +147,7 @@ const SalesOrdersPage = () => {
   const handleSubmit = async (data: SalesOrderFormData) => {
     try {
       setSubmitting(true);
+      const orderDateIso = new Date(data.orderDate).toISOString();
       
       const lines = orderItems
         .filter(item => item.productId && item.quantity && item.unitPrice)
@@ -167,7 +168,7 @@ const SalesOrdersPage = () => {
       if (editingOrder) {
         await salesOrdersService.update(editingOrder.id, {
           customerId: data.customerId,
-          orderDate: data.orderDate,
+          orderDate: orderDateIso,
           lines
         });
         toast.success("Sales order updated successfully");
@@ -175,7 +176,7 @@ const SalesOrdersPage = () => {
         await salesOrdersService.create({
           number: orderNumber,
           customerId: data.customerId,
-          orderDate: data.orderDate,
+          orderDate: orderDateIso,
           lines
         });
         toast.success("Sales order created successfully");
@@ -546,7 +547,7 @@ const SalesOrdersPage = () => {
                       <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button variant="ghost" size="icon" className="transition-opacity">
                               <MoreVertical className="w-4 h-4" />
                             </Button>
                           </DropdownMenuTrigger>

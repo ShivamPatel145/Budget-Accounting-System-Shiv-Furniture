@@ -55,4 +55,11 @@ export const paymentsService = {
         const response = await api.post("/payments", data);
         return response.data.data;
     },
+
+    async downloadReceipt(id: string): Promise<Blob> {
+        const response = await api.get(`/payments/${id}/receipt`, {
+            responseType: "blob",
+        });
+        return response.data;
+    },
 };

@@ -16,12 +16,20 @@ import {
   Calendar,
   IndianRupee,
   Lock,
-  Loader2
+  Loader2,
+  TrendingUp
 } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -52,6 +60,11 @@ interface Budget {
   used: number;
   status: "active" | "archived" | "draft";
   costCenter: string;
+  analyticalAccountId?: string;
+  periodStart?: string;
+  periodEnd?: string;
+  lineType?: string;
+  lineAmount?: number;
   locked: boolean;
   lastRevision: string;
 }
@@ -91,6 +104,7 @@ const BudgetsPage = () => {
   const [loading, setLoading] = useState(true);
   const [showFormPanel, setShowFormPanel] = useState(false);
   const [selectedBudget, setSelectedBudget] = useState<Budget | null>(null);
+  const [detailBudget, setDetailBudget] = useState<Budget | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("all");
 
@@ -130,6 +144,14 @@ const BudgetsPage = () => {
           used,
           status,
           costCenter: b.analyticalAccount?.name || "General",
+          analyticalAccountId: b.analyticalAccountId,
+          periodStart: b.periodStart,
+          periodEnd: b.periodEnd,
+          lineType: incomeLines[0]?.type || expenseLines[0]?.type || "EXPENSE",
+          lineAmount:
+            Number(incomeLines[0]?.budgetedAmount) ||
+            Number(expenseLines[0]?.budgetedAmount) ||
+            0,
           locked: b.status === "ARCHIVED",
           lastRevision: new Date(b.updatedAt).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' })
         };
@@ -166,6 +188,40 @@ const BudgetsPage = () => {
     warningBudgets: budgets.filter(b => b.allocated > 0 && (b.used / b.allocated) >= 0.85 && b.status === "active").length
   };
 
+  const openCreate = () => {
+    setSelectedBudget(null);
+    setShowFormPanel(true);
+  };
+
+  const openEdit = (budget: Budget) => {
+    setSelectedBudget(budget);
+    setShowFormPanel(true);
+  };
+
+  const handleArchive = async (budget: Budget) => {
+    try {
+      await budgetsService.archive(budget.id);
+      toast.success("Budget archived");
+      fetchBudgets();
+    } catch (error) {
+      console.error("Archive failed", error);
+      toast.error("Failed to archive budget");
+    }
+  };
+
+  const handleConfirm = async (budget: Budget) => {
+    try {
+      await budgetsService.confirm(budget.id);
+      toast.success("Budget confirmed");
+      fetchBudgets();
+    } catch (error) {
+      console.error("Confirm failed", error);
+      toast.error("Failed to confirm budget");
+    }
+  };
+
+  const closeDetail = () => setDetailBudget(null);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-[60vh]">
@@ -187,7 +243,7 @@ const BudgetsPage = () => {
           <h1 className="text-2xl font-bold text-foreground">Budget Management</h1>
           <p className="text-muted-foreground">Create and monitor your financial budgets</p>
         </div>
-        <Button variant="gradient" className="gap-2" onClick={() => setShowFormPanel(true)}>
+        <Button variant="gradient" className="gap-2" onClick={openCreate}>
           <Plus className="w-4 h-4" />
           Create Budget
         </Button>
@@ -294,14 +350,16 @@ const BudgetsPage = () => {
             </TableHeader>
             <TableBody>
               {filteredBudgets.map((budget, idx) => {
-                const percentage = Math.round((budget.used / budget.allocated) * 100);
+                const percentage = budget.allocated
+                  ? Math.round((budget.used / budget.allocated) * 100)
+                  : 0;
                 return (
                   <motion.tr
                     key={budget.id}
                     initial={{ opacity: 0, x: -10 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: idx * 0.05, duration: 0.3 }}
-                    className="table-row-hover group"
+                    className="table-row-hover"
                   >
                     <TableCell>
                       <div className="flex items-center gap-2">
@@ -342,25 +400,31 @@ const BudgetsPage = () => {
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button variant="ghost" size="icon">
                             <MoreVertical className="w-4 h-4" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setDetailBudget(budget)}>
                             <Eye className="w-4 h-4 mr-2" />
                             View Details
                           </DropdownMenuItem>
-                          <DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => openEdit(budget)}>
                             <Edit className="w-4 h-4 mr-2" />
                             Edit Budget
                           </DropdownMenuItem>
-                          <DropdownMenuItem>
+                          {budget.status === "draft" && (
+                            <DropdownMenuItem onClick={() => handleConfirm(budget)}>
+                              <CheckCircle className="w-4 h-4 mr-2" />
+                              Confirm Budget
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuItem onClick={() => navigate(`/reports/budget-actual?budgetId=${budget.id}`)}>
                             <TrendingUp className="w-4 h-4 mr-2" />
                             View Transactions
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleArchive(budget)}>
                             <Archive className="w-4 h-4 mr-2" />
                             Archive
                           </DropdownMenuItem>
@@ -378,10 +442,68 @@ const BudgetsPage = () => {
       {/* Side Panel */}
       <BudgetFormPanel 
         open={showFormPanel} 
-        onClose={() => setShowFormPanel(false)}
+        onClose={() => {
+          setShowFormPanel(false);
+          setSelectedBudget(null);
+        }}
         budget={selectedBudget}
         onSuccess={fetchBudgets}
       />
+
+      <Dialog open={!!detailBudget} onOpenChange={(open) => !open && closeDetail()}>
+        <DialogContent className="sm:max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle>{detailBudget?.name}</DialogTitle>
+            <DialogDescription>
+              {detailBudget?.period} · {detailBudget?.costCenter}
+            </DialogDescription>
+          </DialogHeader>
+          {detailBudget && (
+            <div className="space-y-3 text-sm">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-muted-foreground">Type</p>
+                  <p className="font-medium capitalize">{detailBudget.type}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Status</p>
+                  {getStatusBadge(detailBudget.status)}
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Allocated</p>
+                  <p className="font-mono">{formatCurrency(detailBudget.allocated)}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Used</p>
+                  <p className="font-mono">{formatCurrency(detailBudget.used)}</p>
+                </div>
+              </div>
+              <div className="rounded-lg bg-muted/50 p-3">
+                <p className="text-muted-foreground text-xs mb-1">Utilization</p>
+                {getUtilizationBadge(
+                  detailBudget.allocated
+                    ? Math.round((detailBudget.used / detailBudget.allocated) * 100)
+                    : 0,
+                )}
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="outline" size="sm" onClick={() => openEdit(detailBudget)}>
+                  <Edit className="w-4 h-4 mr-1" />
+                  Edit
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => navigate(`/reports/budget-actual?budgetId=${detailBudget.id}`)}
+                >
+                  <TrendingUp className="w-4 h-4 mr-1" />
+                  View Transactions
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </motion.div>
   );
 };

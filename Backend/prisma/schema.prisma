@@ -1,0 +1,344 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  PORTAL
+}
+
+enum ContactType {
+  CUSTOMER
+  VENDOR
+  BOTH
+}
+
+enum AnalyticalType {
+  DEPARTMENT
+  SESSION
+  EVENT
+  PROJECT
+  OTHER
+}
+
+enum BudgetStatus {
+  DRAFT
+  CONFIRMED
+  REVISED
+  ARCHIVED
+}
+
+enum BudgetLineType {
+  INCOME
+  EXPENSE
+}
+
+enum PurchaseStatus {
+  DRAFT
+  CONFIRMED
+  CANCELLED
+}
+
+enum BillStatus {
+  DRAFT
+  CONFIRMED
+  PARTIAL
+  PAID
+  CANCELLED
+}
+
+enum SalesStatus {
+  DRAFT
+  CONFIRMED
+  CANCELLED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  CONFIRMED
+  PARTIAL
+  PAID
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  BANK
+  CARD
+  UPI
+  RAZORPAY
+}
+
+enum PaymentStatus {
+  INITIATED
+  PARTIAL
+  PAID
+  FAILED
+}
+
+enum PaymentType {
+  BILL
+  INVOICE
+}
+
+model User {
+  id             String   @id @default(uuid())
+  name           String
+  loginId        String   @unique
+  email          String   @unique
+  passwordHash   String
+  role           UserRole @default(PORTAL)
+  googleId       String?  @unique
+  avatarUrl      String?
+  contacts       Contact[]
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model Contact {
+  id           String       @id @default(uuid())
+  name         String
+  type         ContactType
+  tags         String[]
+  email        String?
+  phone        String?
+  imageUrl     String?
+  portalUser   User?        @relation(fields: [portalUserId], references: [id])
+  portalUserId String?      @unique
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  // Relations
+  purchaseOrders PurchaseOrder[]
+  vendorBills    VendorBill[]
+  salesOrders    SalesOrder[]
+  invoices       CustomerInvoice[]
+  autoModels     AutoAnalyticalModel[] @relation("AutoModelPartner")
+}
+
+model Product {
+  id             String    @id @default(uuid())
+  name           String    @unique
+  category       String?
+  salesPrice     Decimal   @db.Decimal(18, 2)
+  purchasePrice  Decimal   @db.Decimal(18, 2)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  // Relations
+  poLines        PurchaseOrderLine[]
+  billLines      VendorBillLine[]
+  soLines        SalesOrderLine[]
+  invoiceLines   CustomerInvoiceLine[]
+  autoModels     AutoAnalyticalModel[] @relation("AutoModelProduct")
+}
+
+model AnalyticalAccount {
+  id        String          @id @default(uuid())
+  name      String          @unique
+  type      AnalyticalType
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  budgets   Budget[]
+  poLines   PurchaseOrderLine[]
+  billLines VendorBillLine[]
+  soLines   SalesOrderLine[]
+  invoiceLines CustomerInvoiceLine[]
+  autoModels   AutoAnalyticalModel[]
+}
+
+model Budget {
+  id                   String      @id @default(uuid())
+  name                 String
+  periodStart          DateTime
+  periodEnd            DateTime
+  status               BudgetStatus @default(DRAFT)
+  analyticalAccount    AnalyticalAccount @relation(fields: [analyticalAccountId], references: [id])
+  analyticalAccountId  String
+  version              Int          @default(1)
+  revisionOf           Budget?      @relation("BudgetRevision", fields: [revisionOfId], references: [id])
+  revisionOfId         String?
+  revisions            Budget[]     @relation("BudgetRevision")
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+  lines                BudgetLine[]
+}
+
+model BudgetLine {
+  id              String         @id @default(uuid())
+  budget          Budget         @relation(fields: [budgetId], references: [id])
+  budgetId        String
+  type            BudgetLineType
+  budgetedAmount  Decimal        @db.Decimal(18, 2)
+  actualAmount    Decimal        @default(0) @db.Decimal(18, 2)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+}
+
+model AutoAnalyticalModel {
+  id                   String              @id @default(uuid())
+  name                 String
+  partner              Contact?            @relation("AutoModelPartner", fields: [partnerId], references: [id])
+  partnerId            String?
+  partnerTag           String?
+  product              Product?            @relation("AutoModelProduct", fields: [productId], references: [id])
+  productId            String?
+  productCategory      String?
+  analyticalAccount    AnalyticalAccount   @relation(fields: [analyticalAccountId], references: [id])
+  analyticalAccountId  String
+  priority             Int                 @default(100)
+  active               Boolean             @default(true)
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+}
+
+model PurchaseOrder {
+  id          String             @id @default(uuid())
+  number      String             @unique
+  vendor      Contact            @relation(fields: [vendorId], references: [id])
+  vendorId    String
+  orderDate   DateTime
+  status      PurchaseStatus     @default(DRAFT)
+  total       Decimal            @default(0) @db.Decimal(18, 2)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  lines       PurchaseOrderLine[]
+  vendorBills VendorBill[]
+}
+
+model PurchaseOrderLine {
+  id                  String             @id @default(uuid())
+  purchaseOrder       PurchaseOrder      @relation(fields: [purchaseOrderId], references: [id])
+  purchaseOrderId     String
+  product             Product            @relation(fields: [productId], references: [id])
+  productId           String
+  analyticalAccount   AnalyticalAccount? @relation(fields: [analyticalAccountId], references: [id])
+  analyticalAccountId String?
+  quantity            Decimal            @db.Decimal(18, 2)
+  unitPrice           Decimal            @db.Decimal(18, 2)
+  lineTotal           Decimal            @db.Decimal(18, 2)
+  autoAssigned        Boolean            @default(false)
+}
+
+model VendorBill {
+  id              String        @id @default(uuid())
+  number          String        @unique
+  purchaseOrder   PurchaseOrder? @relation(fields: [purchaseOrderId], references: [id])
+  purchaseOrderId String?
+  vendor          Contact        @relation(fields: [vendorId], references: [id])
+  vendorId        String
+  billDate        DateTime
+  dueDate         DateTime?
+  status          BillStatus     @default(DRAFT)
+  total           Decimal        @default(0) @db.Decimal(18, 2)
+  amountDue       Decimal        @default(0) @db.Decimal(18, 2)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  lines           VendorBillLine[]
+  payments        Payment[]
+}
+
+model VendorBillLine {
+  id                  String             @id @default(uuid())
+  vendorBill          VendorBill         @relation(fields: [vendorBillId], references: [id])
+  vendorBillId        String
+  product             Product            @relation(fields: [productId], references: [id])
+  productId           String
+  analyticalAccount   AnalyticalAccount? @relation(fields: [analyticalAccountId], references: [id])
+  analyticalAccountId String?
+  quantity            Decimal            @db.Decimal(18, 2)
+  unitPrice           Decimal            @db.Decimal(18, 2)
+  lineTotal           Decimal            @db.Decimal(18, 2)
+  autoAssigned        Boolean            @default(false)
+}
+
+model SalesOrder {
+  id          String         @id @default(uuid())
+  number      String         @unique
+  customer    Contact        @relation(fields: [customerId], references: [id])
+  customerId  String
+  orderDate   DateTime
+  status      SalesStatus    @default(DRAFT)
+  total       Decimal        @default(0) @db.Decimal(18, 2)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  lines       SalesOrderLine[]
+  invoices    CustomerInvoice[]
+}
+
+model SalesOrderLine {
+  id                  String             @id @default(uuid())
+  salesOrder          SalesOrder         @relation(fields: [salesOrderId], references: [id])
+  salesOrderId        String
+  product             Product            @relation(fields: [productId], references: [id])
+  productId           String
+  analyticalAccount   AnalyticalAccount? @relation(fields: [analyticalAccountId], references: [id])
+  analyticalAccountId String?
+  quantity            Decimal            @db.Decimal(18, 2)
+  unitPrice           Decimal            @db.Decimal(18, 2)
+  lineTotal           Decimal            @db.Decimal(18, 2)
+  autoAssigned        Boolean            @default(false)
+}
+
+model CustomerInvoice {
+  id              String         @id @default(uuid())
+  number          String         @unique
+  salesOrder      SalesOrder?    @relation(fields: [salesOrderId], references: [id])
+  salesOrderId    String?
+  customer        Contact        @relation(fields: [customerId], references: [id])
+  customerId      String
+  invoiceDate     DateTime
+  dueDate         DateTime?
+  status          InvoiceStatus  @default(DRAFT)
+  total           Decimal        @default(0) @db.Decimal(18, 2)
+  amountDue       Decimal        @default(0) @db.Decimal(18, 2)
+  qrCode          String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  lines           CustomerInvoiceLine[]
+  payments        Payment[]
+}
+
+model CustomerInvoiceLine {
+  id                  String             @id @default(uuid())
+  customerInvoice     CustomerInvoice    @relation(fields: [customerInvoiceId], references: [id])
+  customerInvoiceId   String
+  product             Product            @relation(fields: [productId], references: [id])
+  productId           String
+  analyticalAccount   AnalyticalAccount? @relation(fields: [analyticalAccountId], references: [id])
+  analyticalAccountId String?
+  quantity            Decimal            @db.Decimal(18, 2)
+  unitPrice           Decimal            @db.Decimal(18, 2)
+  lineTotal           Decimal            @db.Decimal(18, 2)
+  autoAssigned        Boolean            @default(false)
+}
+
+model Payment {
+  id               String         @id @default(uuid())
+  number           String         @unique
+  paymentType      PaymentType
+  method           PaymentMethod
+  status           PaymentStatus  @default(INITIATED)
+  amount           Decimal        @db.Decimal(18, 2)
+  paidAt           DateTime?
+  referenceNotes   String?
+  vendorBill       VendorBill?    @relation(fields: [vendorBillId], references: [id])
+  vendorBillId     String?
+  customerInvoice  CustomerInvoice? @relation(fields: [customerInvoiceId], references: [id])
+  customerInvoiceId String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  actorId     String?
+  action      String
+  entity      String
+  entityId    String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+}

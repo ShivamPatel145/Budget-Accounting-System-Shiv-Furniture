@@ -126,6 +126,8 @@ model Product {
   category       String?
   salesPrice     Decimal   @db.Decimal(18, 2)
   purchasePrice  Decimal   @db.Decimal(18, 2)
+  unit           String?
+  unitValue      Decimal?  @db.Decimal(18, 2)
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
   // Relations

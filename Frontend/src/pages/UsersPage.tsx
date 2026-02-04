@@ -3,7 +3,8 @@ import { motion } from "framer-motion";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Search, Edit, Trash2, Users, Eye, EyeOff, ShieldCheck, UserCircle, Filter } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Users, ShieldCheck, UserCircle, Filter } from "lucide-react";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -76,7 +77,8 @@ const createUserSchema = z.object({
     .min(8, "Password must be at least 8 characters")
     .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
     .regex(/[a-z]/, "Password must contain at least one lowercase letter")
-    .regex(/[!@#$%^&*(),.?":{}|<>]/, "Password must contain at least one special character"),
+    .regex(/[!@#$%^&*(),.?":{}|<>]/, "Password must contain at least one special character")
+    .regex(/[0-9]/, "Password must contain at least one number"),
   confirmPassword: z.string(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
@@ -93,7 +95,8 @@ const updateUserSchema = z.object({
     .refine((val) => !val || val.length >= 8, "Password must be at least 8 characters")
     .refine((val) => !val || /[A-Z]/.test(val), "Password must contain at least one uppercase letter")
     .refine((val) => !val || /[a-z]/.test(val), "Password must contain at least one lowercase letter")
-    .refine((val) => !val || /[!@#$%^&*(),.?":{}|<>]/.test(val), "Password must contain at least one special character"),
+    .refine((val) => !val || /[!@#$%^&*(),.?":{}|<>]/.test(val), "Password must contain at least one special character")
+    .refine((val) => !val || /[0-9]/.test(val), "Password must contain at least one number"),
   confirmPassword: z.string().optional(),
 }).refine((data) => !data.password || data.password === data.confirmPassword, {
   message: "Passwords don't match",
@@ -111,8 +114,6 @@ export default function UsersPage() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const createForm = useForm<CreateUserFormData>({
     resolver: zodResolver(createUserSchema),
@@ -167,7 +168,6 @@ export default function UsersPage() {
       toast.success("User created successfully");
       setIsCreateDialogOpen(false);
       createForm.reset();
-      resetPasswordVisibility();
       fetchUsers();
     } catch (error: any) {
       toast.error(error.response?.data?.message || "Failed to create user");
@@ -193,7 +193,6 @@ export default function UsersPage() {
       setIsEditDialogOpen(false);
       setEditingUser(null);
       editForm.reset();
-      resetPasswordVisibility();
       fetchUsers();
     } catch (error: any) {
       toast.error(error.response?.data?.message || "Failed to update user");
@@ -212,16 +211,12 @@ export default function UsersPage() {
     }
   };
 
-  const resetPasswordVisibility = () => {
-    setShowPassword(false);
-    setShowConfirmPassword(false);
-  };
+
 
   const handleCreateDialogChange = (open: boolean) => {
     setIsCreateDialogOpen(open);
     if (!open) {
       createForm.reset();
-      resetPasswordVisibility();
     }
   };
 
@@ -230,7 +225,6 @@ export default function UsersPage() {
     if (!open) {
       setEditingUser(null);
       editForm.reset();
-      resetPasswordVisibility();
     }
   };
 
@@ -355,22 +349,10 @@ export default function UsersPage() {
                     <FormItem>
                       <FormLabel>Password</FormLabel>
                       <FormControl>
-                        <div className="relative">
-                          <Input
-                            type={showPassword ? "text" : "password"}
-                            placeholder="Enter password"
-                            {...field}
-                          />
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
-                            onClick={() => setShowPassword(!showPassword)}
-                          >
-                            {showPassword ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
-                          </Button>
-                        </div>
+                        <PasswordInput
+                          placeholder="Enter password"
+                          {...field}
+                        />
                       </FormControl>
                       <FormDescription>
                         Min 8 chars with uppercase, lowercase, and special character
@@ -386,22 +368,10 @@ export default function UsersPage() {
                     <FormItem>
                       <FormLabel>Re-Enter Password</FormLabel>
                       <FormControl>
-                        <div className="relative">
-                          <Input
-                            type={showConfirmPassword ? "text" : "password"}
-                            placeholder="Confirm password"
-                            {...field}
-                          />
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
-                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                          >
-                            {showConfirmPassword ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
-                          </Button>
-                        </div>
+                        <PasswordInput
+                          placeholder="Confirm password"
+                          {...field}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -539,7 +509,7 @@ export default function UsersPage() {
                       <TableCell className="font-mono text-sm">{user.loginId}</TableCell>
                       <TableCell className="text-muted-foreground">{user.email}</TableCell>
                       <TableCell>
-                        <Badge 
+                        <Badge
                           variant={user.role === "ADMIN" ? "default" : "secondary"}
                           className={user.role === "ADMIN" ? "bg-success/10 text-success hover:bg-success/20" : ""}
                         >
@@ -667,22 +637,10 @@ export default function UsersPage() {
                   <FormItem>
                     <FormLabel>New Password (Optional)</FormLabel>
                     <FormControl>
-                      <div className="relative">
-                        <Input
-                          type={showPassword ? "text" : "password"}
-                          placeholder="Leave blank to keep current password"
-                          {...field}
-                        />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
-                          onClick={() => setShowPassword(!showPassword)}
-                        >
-                          {showPassword ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
-                        </Button>
-                      </div>
+                      <PasswordInput
+                        placeholder="Leave blank to keep current password"
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -695,22 +653,10 @@ export default function UsersPage() {
                   <FormItem>
                     <FormLabel>Confirm New Password</FormLabel>
                     <FormControl>
-                      <div className="relative">
-                        <Input
-                          type={showConfirmPassword ? "text" : "password"}
-                          placeholder="Confirm new password"
-                          {...field}
-                        />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
-                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                        >
-                          {showConfirmPassword ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
-                        </Button>
-                      </div>
+                      <PasswordInput
+                        placeholder="Confirm new password"
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

@@ -25,4 +25,14 @@ export const aiService = {
         const response = await api.get("/ai/anomalies");
         return response.data.data;
     },
+
+    async getPredictions(): Promise<any[]> {
+        const response = await api.get("/ai/predictions");
+        return response.data.data;
+    },
+
+    async getTrends(): Promise<{ month: string; efficiency: number; cost: number }[]> {
+        const response = await api.get("/ai/trends");
+        return response.data.data;
+    },
 };

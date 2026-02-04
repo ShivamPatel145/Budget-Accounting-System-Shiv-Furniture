@@ -3,12 +3,12 @@ import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { 
-  PieChart, 
-  Pie, 
-  Cell, 
-  ResponsiveContainer, 
-  Tooltip 
+import {
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+  Tooltip
 } from "recharts";
 import { PieChart as PieChartIcon, ChevronRight, TrendingUp, TrendingDown, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -63,7 +63,7 @@ const CostCenterSnapshot = () => {
 
         // Create a map of analytical account ID to budget data
         const budgetMap = new Map<string, { income: number; expense: number }>();
-        
+
         budgets.forEach((budget: Budget) => {
           if (budget.status === "CONFIRMED" || budget.status === "REVISED") {
             const existing = budgetMap.get(budget.analyticalAccountId) || { income: 0, expense: 0 };
@@ -82,10 +82,10 @@ const CostCenterSnapshot = () => {
           const budgetData = budgetMap.get(account.id) || { income: 0, expense: 0 };
           const value = budgetData.income + budgetData.expense; // Total activity
           const profit = budgetData.income - budgetData.expense;
-          
+
           return {
             name: account.name,
-            value: value || 100000 * (5 - idx), // Fallback for visualization
+            value: value || 0,
             profit: profit,
             color: COLORS[idx % COLORS.length]
           };
@@ -117,9 +117,9 @@ const CostCenterSnapshot = () => {
             <p className="text-sm text-muted-foreground">Revenue distribution by center</p>
           </div>
         </div>
-        <Button 
-          variant="ghost" 
-          size="sm" 
+        <Button
+          variant="ghost"
+          size="sm"
           className="gap-1 text-muted-foreground"
           onClick={() => navigate("/cost-center-profitability")}
         >
@@ -171,8 +171,8 @@ const CostCenterSnapshot = () => {
                   className="flex items-center justify-between"
                 >
                   <div className="flex items-center gap-2">
-                    <div 
-                      className="w-3 h-3 rounded-full" 
+                    <div
+                      className="w-3 h-3 rounded-full"
                       style={{ backgroundColor: item.color }}
                     />
                     <span className="text-sm text-muted-foreground">{item.name}</span>

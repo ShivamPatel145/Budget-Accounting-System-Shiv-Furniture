@@ -6,6 +6,8 @@ export interface Product {
     category?: string;
     salesPrice: number;
     purchasePrice: number;
+    unit?: string;
+    unitValue?: number;
     createdAt: string;
     updatedAt: string;
 }
@@ -15,6 +17,8 @@ export interface CreateProductData {
     category?: string;
     salesPrice: number;
     purchasePrice: number;
+    unit?: string;
+    unitValue?: number;
 }
 
 export interface UpdateProductData extends Partial<CreateProductData> { }

@@ -3,12 +3,12 @@ import { motion } from "framer-motion";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { 
-  Plus, 
-  Search, 
-  Edit, 
-  Trash2, 
-  Package, 
+import {
+  Plus,
+  Search,
+  Edit,
+  Trash2,
+  Package,
   Filter,
   Tag,
   IndianRupee,
@@ -83,12 +83,22 @@ const productSchema = z.object({
   salesPrice: z.coerce.number().min(0, "Sales price must be positive"),
   purchasePrice: z.coerce.number().min(0, "Purchase price must be positive"),
   unit: z.string().optional(),
+  unitValue: z.coerce.number().min(0, "Value must be positive").optional(),
 });
 
 type ProductFormData = z.infer<typeof productSchema>;
 
 const categories = ["Furniture", "Electronics", "Stationery", "Raw Materials", "Services"];
 const units = ["Piece", "Kg", "Meter", "Liter", "Box", "Hour"];
+
+const unitConfig: Record<string, { label: string; placeholder: string }> = {
+  Kg: { label: "Weight (kg)", placeholder: "e.g., 50" },
+  Liter: { label: "Volume (L)", placeholder: "e.g., 1" },
+  Meter: { label: "Length (m)", placeholder: "e.g., 10" },
+  Box: { label: "Items per Box", placeholder: "e.g., 12" },
+  Hour: { label: "Duration (hours)", placeholder: "e.g., 1" },
+  Piece: { label: "Pack Size / Quantity", placeholder: "e.g., 1" }
+};
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('en-IN', {
@@ -177,28 +187,29 @@ const ProductsPage = () => {
       category: product.category || "",
       salesPrice: product.salesPrice,
       purchasePrice: product.purchasePrice,
-      unit: "Piece",
+      unit: product.unit || "",
+      unitValue: product.unitValue || 0,
     });
     setIsDialogOpen(true);
   };
 
   const filteredProducts = products.filter((product) => {
     const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         (product.category?.toLowerCase().includes(searchQuery.toLowerCase()) || false);
-    const matchesTab = activeTab === "all" || 
-                      (activeTab === "furniture" && product.category === "Furniture") ||
-                      (activeTab === "materials" && product.category === "Raw Materials");
+      (product.category?.toLowerCase().includes(searchQuery.toLowerCase()) || false);
+    const matchesTab = activeTab === "all" ||
+      (activeTab === "furniture" && product.category === "Furniture") ||
+      (activeTab === "materials" && product.category === "Raw Materials");
     return matchesSearch && matchesTab;
   });
 
   const totalProducts = products.length;
   const totalSalesValue = products.reduce((sum, p) => sum + Number(p.salesPrice), 0);
-  const avgMargin = products.length > 0 
+  const avgMargin = products.length > 0
     ? products.reduce((sum, p) => {
-        const sales = Number(p.salesPrice);
-        const purchase = Number(p.purchasePrice);
-        return sum + (sales > 0 ? ((sales - purchase) / sales * 100) : 0);
-      }, 0) / products.length
+      const sales = Number(p.salesPrice);
+      const purchase = Number(p.purchasePrice);
+      return sum + (sales > 0 ? ((sales - purchase) / sales * 100) : 0);
+    }, 0) / products.length
     : 0;
 
   return (
@@ -288,7 +299,26 @@ const ProductsPage = () => {
                       </FormItem>
                     )}
                   />
+
                 </div>
+
+                {/* Dynamic Unit Value Field */}
+                {form.watch("unit") && (
+                  <FormField
+                    control={form.control}
+                    name="unitValue"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{unitConfig[form.watch("unit") as string]?.label || "Quantity"}</FormLabel>
+                        <FormControl>
+                          <Input type="number" placeholder={unitConfig[form.watch("unit") as string]?.placeholder} {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+
                 <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
@@ -407,18 +437,19 @@ const ProductsPage = () => {
                   <TableRow className="bg-muted/50">
                     <TableHead>Product</TableHead>
                     <TableHead>Category</TableHead>
-                    <TableHead className="text-right">Purchase Price</TableHead>
-                    <TableHead className="text-right">Sales Price</TableHead>
-                    <TableHead className="text-right">Margin</TableHead>
+                    <TableHead>Purchase Price</TableHead>
+                    <TableHead>Sales Price</TableHead>
+                    <TableHead>Margin</TableHead>
+                    <TableHead>Quantity</TableHead>
                     <TableHead>Unit</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredProducts.map((product, idx) => {
                     const salesPrice = Number(product.salesPrice);
                     const purchasePrice = Number(product.purchasePrice);
-                    const margin = salesPrice > 0 
+                    const margin = salesPrice > 0
                       ? ((salesPrice - purchasePrice) / salesPrice * 100)
                       : 0;
                     return (
@@ -447,24 +478,29 @@ const ProductsPage = () => {
                             </Badge>
                           )}
                         </TableCell>
-                        <TableCell className="text-right font-mono">
+                        <TableCell className="font-mono">
                           {formatCurrency(purchasePrice)}
                         </TableCell>
-                        <TableCell className="text-right font-mono font-medium">
+                        <TableCell className="font-mono font-medium">
                           {formatCurrency(salesPrice)}
                         </TableCell>
-                        <TableCell className="text-right">
-                          <Badge 
-                            variant="outline" 
+                        <TableCell>
+                          <Badge
+                            variant="outline"
                             className={margin > 20 ? "text-success bg-success/10" : margin > 10 ? "text-warning bg-warning/10" : "text-destructive bg-destructive/10"}
                           >
                             {margin > 0 ? <TrendingUp className="w-3 h-3 mr-1" /> : <TrendingDown className="w-3 h-3 mr-1" />}
                             {margin.toFixed(1)}%
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-muted-foreground">Piece</TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-1">
+                        <TableCell className="font-medium">
+                          {product.unitValue && Number(product.unitValue) > 0 ? product.unitValue : "-"}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {product.unit || "-"}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex justify-start gap-1">
                             <Button
                               variant="ghost"
                               size="sm"

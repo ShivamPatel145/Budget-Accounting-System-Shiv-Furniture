@@ -5,12 +5,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from "recharts";
-import { 
-  Brain, 
-  TrendingUp, 
-  TrendingDown, 
-  AlertTriangle, 
-  Lightbulb, 
+import {
+  Brain,
+  TrendingUp,
+  TrendingDown,
+  AlertTriangle,
+  Lightbulb,
   Target,
   Zap,
   CheckCircle,
@@ -62,14 +62,22 @@ const AIInsightsPage = () => {
 
   const fetchData = async () => {
     try {
-      const [budgetInsights, anomalies, stats, budgets] = await Promise.all([
+      const [budgetInsights, anomalies, stats, budgets, realPredictions, realTrends] = await Promise.all([
         aiService.getInsights().catch(() => [] as BudgetInsight[]),
         aiService.getAnomalies().catch(() => [] as Anomaly[]),
         dashboardService.getStats().catch(() => null),
-        budgetsService.list().catch(() => [] as Budget[])
+        budgetsService.list().catch(() => [] as Budget[]),
+        aiService.getPredictions().catch(() => []),
+        aiService.getTrends().catch(() => [])
       ]);
 
       const generatedInsights: AIInsight[] = [];
+      // ... (existing insights logic) ...
+
+      // Set Real Data
+      setInsights(generatedInsights);
+      setPredictionData(realPredictions);
+      setTrendData(realTrends);
 
       // Convert budget insights to AIInsight format
       budgetInsights.forEach((insight: BudgetInsight, idx: number) => {
@@ -107,7 +115,7 @@ const AIInsightsPage = () => {
           id: "summary",
           type: "summary",
           title: `Overall Financial Health: ${isHealthy ? "Good" : "Needs Attention"}`,
-          description: isHealthy 
+          description: isHealthy
             ? `Net profit of ${formatCurrency(profit)}. ${stats.activeBudgetsCount} active budgets being tracked.`
             : `Net loss of ${formatCurrency(Math.abs(profit))}. Consider reviewing expenses.`,
           severity: isHealthy ? "low" : "high",
@@ -144,47 +152,6 @@ const AIInsightsPage = () => {
       }
 
       setInsights(generatedInsights);
-
-      // Generate prediction data from budgets
-      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
-      const now = new Date();
-      const currentMonth = now.getMonth();
-      
-      const predictions: PredictionData[] = months.map((month, idx) => {
-        // Calculate actual from budgets for past months
-        const isCurrentOrPast = idx <= currentMonth;
-        const baseValue = 400000 + (idx * 30000); // Base prediction line
-        
-        // Sum actual amounts from budgets
-        let actual = 0;
-        if (isCurrentOrPast) {
-          budgets.forEach((budget: Budget) => {
-            budget.lines.forEach(line => {
-              if (line.type === "EXPENSE") {
-                actual += line.actualAmount || 0;
-              }
-            });
-          });
-          actual = actual / (budgets.length || 1) + (idx * 10000);
-        }
-
-        return {
-          month,
-          predicted: baseValue,
-          actual: isCurrentOrPast ? Math.max(actual, baseValue * 0.8) : 0,
-          confidence: 95 - (idx * 3)
-        };
-      });
-
-      setPredictionData(predictions);
-
-      // Generate trend data
-      const trends = ['Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'].map((month, idx) => ({
-        month,
-        efficiency: 78 + (idx * 3),
-        cost: 120000 - (idx * 4000)
-      }));
-      setTrendData(trends);
 
     } catch (error) {
       console.error("Error fetching AI data:", error);
@@ -381,38 +348,38 @@ const AIInsightsPage = () => {
                 <AreaChart data={predictionData}>
                   <defs>
                     <linearGradient id="predictedGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
                     </linearGradient>
                     <linearGradient id="actualGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--success))" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="hsl(var(--success))" stopOpacity={0}/>
+                      <stop offset="5%" stopColor="hsl(var(--success))" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="hsl(var(--success))" stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                  <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickFormatter={(value) => `₹${value/1000}K`} />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: "hsl(var(--card))", 
+                  <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickFormatter={(value) => `₹${value / 1000}K`} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--card))",
                       border: "1px solid hsl(var(--border))",
                       borderRadius: "8px"
                     }}
                     formatter={(value: number) => [formatCurrency(value), ""]}
                   />
-                  <Area 
-                    type="monotone" 
-                    dataKey="predicted" 
-                    stroke="hsl(var(--primary))" 
-                    fill="url(#predictedGradient)" 
+                  <Area
+                    type="monotone"
+                    dataKey="predicted"
+                    stroke="hsl(var(--primary))"
+                    fill="url(#predictedGradient)"
                     strokeWidth={2}
                     name="Predicted"
                   />
-                  <Area 
-                    type="monotone" 
-                    dataKey="actual" 
-                    stroke="hsl(var(--success))" 
-                    fill="url(#actualGradient)" 
+                  <Area
+                    type="monotone"
+                    dataKey="actual"
+                    stroke="hsl(var(--success))"
+                    fill="url(#actualGradient)"
                     strokeWidth={2}
                     name="Actual"
                   />
@@ -453,40 +420,40 @@ const AIInsightsPage = () => {
                 <LineChart data={trendData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                  <YAxis 
-                    yAxisId="left" 
-                    stroke="hsl(var(--muted-foreground))" 
-                    fontSize={12} 
+                  <YAxis
+                    yAxisId="left"
+                    stroke="hsl(var(--muted-foreground))"
+                    fontSize={12}
                     tickFormatter={(value) => `${value}%`}
                   />
-                  <YAxis 
-                    yAxisId="right" 
-                    orientation="right" 
-                    stroke="hsl(var(--muted-foreground))" 
+                  <YAxis
+                    yAxisId="right"
+                    orientation="right"
+                    stroke="hsl(var(--muted-foreground))"
                     fontSize={12}
-                    tickFormatter={(value) => `₹${value/1000}K`}
+                    tickFormatter={(value) => `₹${value / 1000}K`}
                   />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: "hsl(var(--card))", 
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--card))",
                       border: "1px solid hsl(var(--border))",
                       borderRadius: "8px"
                     }}
                   />
-                  <Line 
+                  <Line
                     yAxisId="left"
-                    type="monotone" 
-                    dataKey="efficiency" 
-                    stroke="hsl(var(--success))" 
+                    type="monotone"
+                    dataKey="efficiency"
+                    stroke="hsl(var(--success))"
                     strokeWidth={2}
                     dot={{ fill: "hsl(var(--success))", strokeWidth: 2 }}
                     name="Efficiency %"
                   />
-                  <Line 
+                  <Line
                     yAxisId="right"
-                    type="monotone" 
-                    dataKey="cost" 
-                    stroke="hsl(var(--destructive))" 
+                    type="monotone"
+                    dataKey="cost"
+                    stroke="hsl(var(--destructive))"
                     strokeWidth={2}
                     dot={{ fill: "hsl(var(--destructive))", strokeWidth: 2 }}
                     name="Cost"

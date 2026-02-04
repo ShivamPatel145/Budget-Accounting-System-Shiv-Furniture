@@ -46,7 +46,7 @@ const AISmartSummary = () => {
       if (stats) {
         const profit = stats.totalIncome - stats.totalExpense;
         const profitMargin = stats.totalIncome > 0 ? (profit / stats.totalIncome * 100) : 0;
-        
+
         if (profit > 0) {
           generatedInsights.push({
             icon: TrendingUp,
@@ -66,9 +66,12 @@ const AISmartSummary = () => {
         }
 
         // Generate prediction based on stats
-        if (stats.totalIncome > 0) {
-          const growthEstimate = Math.floor(Math.random() * 15) + 5; // 5-20% estimate
-          setPrediction(`Based on current trends, expect approximately +${growthEstimate}% revenue growth next month.`);
+        if (stats.incomeChange > 0) {
+          setPrediction(`Based on current trends, revenue is up +${stats.incomeChange}% compared to last period.`);
+        } else if (stats.incomeChange < 0) {
+          setPrediction(`Revenue is trending down ${stats.incomeChange}%. Consider reviewing underperforming cost centers.`);
+        } else {
+          setPrediction("Stable revenue trend observed. No significant changes predicted.");
         }
       }
 
@@ -132,9 +135,9 @@ const AISmartSummary = () => {
             <p className="text-sm text-muted-foreground">Intelligent insights</p>
           </div>
         </div>
-        <Button 
-          variant="ghost" 
-          size="icon" 
+        <Button
+          variant="ghost"
+          size="icon"
           className="text-muted-foreground"
           onClick={handleRefresh}
           disabled={refreshing}
@@ -176,8 +179,8 @@ const AISmartSummary = () => {
               </div>
             </div>
 
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="w-full gap-2"
               onClick={() => navigate("/ai-insights")}
             >

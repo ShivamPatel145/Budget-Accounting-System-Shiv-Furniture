@@ -3,12 +3,14 @@ import { ApiError } from "../utils/ApiError.js";
 
 class ProductService {
   #sanitize(data) {
-    return {
-      name: data.name,
-      category: data.category ?? null,
-      salesPrice: data.salesPrice ?? "0",
-      purchasePrice: data.purchasePrice ?? "0",
-    };
+    const payload = {};
+    if (data.name !== undefined) payload.name = data.name;
+    if (data.category !== undefined) payload.category = data.category;
+    if (data.salesPrice !== undefined) payload.salesPrice = data.salesPrice;
+    if (data.purchasePrice !== undefined) payload.purchasePrice = data.purchasePrice;
+    if (data.unit !== undefined) payload.unit = data.unit;
+    if (data.unitValue !== undefined) payload.unitValue = data.unitValue;
+    return payload;
   }
 
   async listProducts() {

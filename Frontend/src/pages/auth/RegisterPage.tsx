@@ -12,6 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
+import { PasswordInput } from "@/components/ui/password-input";
 
 const registerSchema = z
   .object({
@@ -24,7 +25,8 @@ const registerSchema = z
       .min(8, "Password must be at least 8 characters")
       .regex(/[A-Z]/, "Must include an uppercase letter")
       .regex(/[a-z]/, "Must include a lowercase letter")
-      .regex(/[!@#$%^&*(),.?":{}|<>]/, "Must include a special character"),
+      .regex(/[!@#$%^&*(),.?":{}|<>]/, "Must include a special character")
+      .regex(/[0-9]/, "Must include a number"),
     confirmPassword: z.string(),
   })
   .refine((data) => data.password === data.confirmPassword, {
@@ -141,16 +143,14 @@ export default function RegisterPage() {
           <div className="grid grid-cols-2 gap-3">
             <div
               onClick={() => form.setValue("role", "ADMIN")}
-              className={`cursor-pointer border rounded-lg px-4 py-3 text-center transition-all flex items-center justify-center gap-2 ${
-                selectedRole === "ADMIN"
-                  ? "bg-primary text-white border-primary"
-                  : "bg-background text-foreground border-input hover:border-primary/50"
-              }`}
+              className={`cursor-pointer border rounded-lg px-4 py-3 text-center transition-all flex items-center justify-center gap-2 ${selectedRole === "ADMIN"
+                ? "bg-primary text-white border-primary"
+                : "bg-background text-foreground border-input hover:border-primary/50"
+                }`}
             >
               <div
-                className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${
-                  selectedRole === "ADMIN" ? "border-white" : "border-muted-foreground"
-                }`}
+                className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${selectedRole === "ADMIN" ? "border-white" : "border-muted-foreground"
+                  }`}
               >
                 {selectedRole === "ADMIN" && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
               </div>
@@ -159,16 +159,14 @@ export default function RegisterPage() {
 
             <div
               onClick={() => form.setValue("role", "PORTAL")}
-              className={`cursor-pointer border rounded-lg px-4 py-3 text-center transition-all flex items-center justify-center gap-2 ${
-                selectedRole === "PORTAL"
-                  ? "bg-primary text-white border-primary"
-                  : "bg-background text-foreground border-input hover:border-primary/50"
-              }`}
+              className={`cursor-pointer border rounded-lg px-4 py-3 text-center transition-all flex items-center justify-center gap-2 ${selectedRole === "PORTAL"
+                ? "bg-primary text-white border-primary"
+                : "bg-background text-foreground border-input hover:border-primary/50"
+                }`}
             >
               <div
-                className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${
-                  selectedRole === "PORTAL" ? "border-white" : "border-muted-foreground"
-                }`}
+                className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${selectedRole === "PORTAL" ? "border-white" : "border-muted-foreground"
+                  }`}
               >
                 {selectedRole === "PORTAL" && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
               </div>
@@ -180,9 +178,8 @@ export default function RegisterPage() {
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label htmlFor="password">Password</Label>
-            <Input
+            <PasswordInput
               id="password"
-              type="password"
               placeholder="Min 8 chars"
               {...form.register("password")}
               className="input-focus h-12"
@@ -195,9 +192,8 @@ export default function RegisterPage() {
 
           <div className="space-y-1.5">
             <Label htmlFor="confirmPassword">Confirm</Label>
-            <Input
+            <PasswordInput
               id="confirmPassword"
-              type="password"
               placeholder="Retype"
               {...form.register("confirmPassword")}
               className="input-focus h-12"

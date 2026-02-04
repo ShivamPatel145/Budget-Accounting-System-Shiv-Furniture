@@ -13,6 +13,7 @@ import { Separator } from "@/components/ui/separator";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
+import { PasswordInput } from "@/components/ui/password-input";
 
 const loginSchema = z.object({
   loginId: z.string().min(1, "Email or Login ID is required"),
@@ -26,6 +27,8 @@ type LoginSchema = z.infer<typeof loginSchema>;
 export default function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
+  // Password visibility state is handled internally by PasswordInput now
+
   const form = useForm<LoginSchema>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
@@ -45,7 +48,7 @@ export default function LoginPage() {
     try {
       await login(data.loginId, data.password);
       navigate("/dashboard");
-    } catch (error) {
+    } catch (error: any) {
       const message = error?.response?.data?.message || "Login failed";
       toast.error(message);
       form.setError("password", { message });
@@ -70,9 +73,8 @@ export default function LoginPage() {
             <button
               type="button"
               onClick={() => form.setValue("role", "ADMIN")}
-              className={`cursor-pointer border rounded-lg p-2 text-center transition-all flex items-center justify-center gap-2 ${
-                selectedRole === "ADMIN" ? "bg-primary text-white border-primary" : "bg-background text-foreground border-input hover:border-primary/50"
-              }`}
+              className={`cursor-pointer border rounded-lg p-2 text-center transition-all flex items-center justify-center gap-2 ${selectedRole === "ADMIN" ? "bg-primary text-white border-primary" : "bg-background text-foreground border-input hover:border-primary/50"
+                }`}
             >
               <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${selectedRole === "ADMIN" ? "border-white" : "border-muted-foreground"}`}>
                 {selectedRole === "ADMIN" && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
@@ -82,9 +84,8 @@ export default function LoginPage() {
             <button
               type="button"
               onClick={() => form.setValue("role", "PORTAL")}
-              className={`cursor-pointer border rounded-lg p-2 text-center transition-all flex items-center justify-center gap-2 ${
-                selectedRole === "PORTAL" ? "bg-primary text-white border-primary" : "bg-background text-foreground border-input hover:border-primary/50"
-              }`}
+              className={`cursor-pointer border rounded-lg p-2 text-center transition-all flex items-center justify-center gap-2 ${selectedRole === "PORTAL" ? "bg-primary text-white border-primary" : "bg-background text-foreground border-input hover:border-primary/50"
+                }`}
             >
               <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${selectedRole === "PORTAL" ? "border-white" : "border-muted-foreground"}`}>
                 {selectedRole === "PORTAL" && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
@@ -118,9 +119,8 @@ export default function LoginPage() {
               Forgot password?
             </Link>
           </div>
-          <Input
+          <PasswordInput
             id="password"
-            type="password"
             placeholder="Enter your password"
             {...form.register("password")}
             className="input-focus"
